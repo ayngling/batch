@@ -26,6 +26,11 @@ const Size = 500
 
 // batch slice into frames of Size
 func DeleteMulti(c appengine.Context, key []*datastore.Key) error {
+	// only split into batches if needed
+	if len(key) <= Size {
+		return datastore.DeleteMulti(c, key)
+	}
+
 	var errs []error
 	var batch []*datastore.Key
 	l := len(key)
@@ -64,17 +69,17 @@ func DeleteMulti(c appengine.Context, key []*datastore.Key) error {
 }
 
 func PutMulti(c appengine.Context, key []*datastore.Key, src interface{}) ([]*datastore.Key, error) {
+	// only split into batches if needed
+	if len(key) <= Size {
+		return datastore.PutMulti(c, key, src)
+	}
+
 	v := reflect.ValueOf(src)
 	if v.Kind() != reflect.Slice {
 		return nil, errors.New("src is not a slice")
 	}
 
 	l := v.Len()
-
-	// only split into batches if needed
-	if l <= Size {
-		return datastore.PutMulti(c, key, src)
-	}
 
 	if len(key) != l {
 		return nil, errors.New("length of key and src does not match")
