@@ -71,7 +71,7 @@ func PutMulti(c appengine.Context, key []*datastore.Key, src interface{}) ([]*da
 
 	l := v.Len()
 
-	// only split into batches if it is needed
+	// only split into batches if needed
 	if l <= Size {
 		return datastore.PutMulti(c, key, src)
 	}
