@@ -71,6 +71,11 @@ func PutMulti(c appengine.Context, key []*datastore.Key, src interface{}) ([]*da
 
 	l := v.Len()
 
+	// only split into batches if it is needed
+	if l <= Size {
+		return datastore.PutMulti(c, key, src)
+	}
+
 	if len(key) != l {
 		return nil, errors.New("length of key and src does not match")
 	}
