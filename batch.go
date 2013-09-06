@@ -22,12 +22,14 @@ import (
 	"reflect"
 )
 
-const Size = 500
+const SizeGet = 1000
+const SizeDelete = 500
+const SizePut = 500
 
 // batch slice into frames of Size
 func DeleteMulti(c appengine.Context, key []*datastore.Key) error {
 	// only split into batches if needed
-	if len(key) <= Size {
+	if len(key) <= SizeDelete {
 		return datastore.DeleteMulti(c, key)
 	}
 
@@ -35,8 +37,8 @@ func DeleteMulti(c appengine.Context, key []*datastore.Key) error {
 	var batch []*datastore.Key
 	l := len(key)
 
-	for s, e := 0, 0; s < l; s += Size {
-		e = s + Size
+	for s, e := 0, 0; s < l; s += SizeDelete {
+		e = s + SizeDelete
 		if e >= l {
 			e = l
 		}
@@ -70,7 +72,7 @@ func DeleteMulti(c appengine.Context, key []*datastore.Key) error {
 
 func PutMulti(c appengine.Context, key []*datastore.Key, src interface{}) ([]*datastore.Key, error) {
 	// only split into batches if needed
-	if len(key) <= Size {
+	if len(key) <= SizePut {
 		return datastore.PutMulti(c, key, src)
 	}
 
@@ -88,26 +90,25 @@ func PutMulti(c appengine.Context, key []*datastore.Key, src interface{}) ([]*da
 	var batch []*datastore.Key
 	var errs []error
 
-	for i, e := 0, 0; i < l; i += Size {
-		e = i + Size
+	for i, e := 0, 0; i < l; i += SizePut {
+		e = i + SizePut
 		if e >= l {
 			e = l
 		}
 
 		batch = key[i:e]
 
-		s := reflect.MakeSlice(v.Type(), 0, Size)
-		for j := 0; j < Size && i+j < l; j++ {
+		s := reflect.MakeSlice(v.Type(), 0, SizePut)
+		for j := 0; j < SizePut && i+j < l; j++ {
 			s = reflect.Append(s, v.Index(i+j))
 		}
-
+		
 		k, err := datastore.PutMulti(c, batch, s.Interface())
 		if err != nil {
 			if me, ok := err.(appengine.MultiError); ok {
 				if len(errs) == 0 { // lazy init
 					errs = make([]error, 0, l)
 				}
-
 				for i := range me {
 					errs = append(errs, me[i])
 				}
@@ -130,4 +131,60 @@ func PutMulti(c appengine.Context, key []*datastore.Key, src interface{}) ([]*da
 		return key, appengine.MultiError(errs) // combined multi-error for the whole set
 	}
 	return key, nil
+}
+
+func GetMulti(c appengine.Context, key []*datastore.Key, src interface{}) (error) {
+	if len(key) <= SizeGet {
+		return datastore.GetMulti(c, key, src)
+	}
+
+	// Validate the input interface
+	v := reflect.ValueOf(src)
+	if v.Kind() != reflect.Slice {
+		return errors.New("src is not a slice")
+	}
+
+	var errs []error
+	var batch []*datastore.Key
+	l := len(key)
+
+	for i, e := 0, 0; i < l; i += SizeGet {
+		e = i + SizeGet
+		if e > l {
+			e = l
+		}
+
+		batch = key[i:e]
+
+		s := reflect.MakeSlice(v.Type(), 0, len(key))//SizeGet)
+		for j := 0; j < SizeGet && i+j < l; j++ {
+			s = reflect.Append(s, v.Index(i+j))
+		}
+
+		c.Infof("Fetching: %v %v", i, e)
+		err := datastore.GetMulti(c, batch, s.Interface())
+		if err != nil {
+			if me, ok := err.(appengine.MultiError); ok {
+				if len(errs) == 0 { // lazy init
+					errs = make([]error, 0, l)
+				}
+
+				for i := range me {
+					errs = append(errs, me[i])
+				}
+			} else {
+				return err
+			}
+		} else if len(errs) > 0 { // no errors, but another batch had errors, so add nils
+			for _ = range batch {
+				errs = append(errs, nil)
+			}
+		}
+	}
+
+	if len(errs) > 0 {
+		return appengine.MultiError(errs) // combined multi-error for the whole set
+	}
+
+	return nil
 }
