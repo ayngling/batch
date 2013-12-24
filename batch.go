@@ -102,7 +102,7 @@ func PutMulti(c appengine.Context, key []*datastore.Key, src interface{}) ([]*da
 		for j := 0; j < SizePut && i+j < l; j++ {
 			s = reflect.Append(s, v.Index(i+j))
 		}
-		
+
 		k, err := datastore.PutMulti(c, batch, s.Interface())
 		if err != nil {
 			if me, ok := err.(appengine.MultiError); ok {
@@ -133,7 +133,7 @@ func PutMulti(c appengine.Context, key []*datastore.Key, src interface{}) ([]*da
 	return key, nil
 }
 
-func GetMulti(c appengine.Context, key []*datastore.Key, src interface{}) (error) {
+func GetMulti(c appengine.Context, key []*datastore.Key, src interface{}) error {
 	if len(key) <= SizeGet {
 		return datastore.GetMulti(c, key, src)
 	}
@@ -156,7 +156,7 @@ func GetMulti(c appengine.Context, key []*datastore.Key, src interface{}) (error
 
 		batch = key[i:e]
 
-		s := reflect.MakeSlice(v.Type(), 0, len(key))//SizeGet)
+		s := reflect.MakeSlice(v.Type(), 0, len(key)) //SizeGet)
 		for j := 0; j < SizeGet && i+j < l; j++ {
 			s = reflect.Append(s, v.Index(i+j))
 		}
