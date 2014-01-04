@@ -22,20 +22,23 @@ import (
 	"reflect"
 )
 
-const SizeGet = 1000
-const SizeDelete = 500
-const SizePut = 500
+var (
+	SizeGet    int = 1000
+	SizePut    int = 500
+	SizeDelete int = 500
+)
 
 // batch slice into frames of Size
 func DeleteMulti(c appengine.Context, key []*datastore.Key) error {
+	l := len(key)
+
 	// only split into batches if needed
-	if len(key) <= SizeDelete {
+	if l <= SizeDelete {
 		return datastore.DeleteMulti(c, key)
 	}
 
 	var errs []error
 	var batch []*datastore.Key
-	l := len(key)
 
 	for s, e := 0, 0; s < l; s += SizeDelete {
 		e = s + SizeDelete
@@ -48,7 +51,7 @@ func DeleteMulti(c appengine.Context, key []*datastore.Key) error {
 		if err := datastore.DeleteMulti(c, batch); err != nil {
 			if me, ok := err.(appengine.MultiError); ok {
 				if len(errs) == 0 { // lazy init
-					errs = make([]error, 0, l)
+					errs = make([]error, s, l) // add nils for previous batches
 				}
 
 				for i := range me {
@@ -107,7 +110,7 @@ func PutMulti(c appengine.Context, key []*datastore.Key, src interface{}) ([]*da
 		if err != nil {
 			if me, ok := err.(appengine.MultiError); ok {
 				if len(errs) == 0 { // lazy init
-					errs = make([]error, 0, l)
+					errs = make([]error, i, l) // add nils for previous batches
 				}
 				for i := range me {
 					errs = append(errs, me[i])
@@ -134,6 +137,53 @@ func PutMulti(c appengine.Context, key []*datastore.Key, src interface{}) ([]*da
 }
 
 func GetMulti(c appengine.Context, key []*datastore.Key, src interface{}) (error) {
+	l := len(key)
+
+	// only split into batches if needed
+	if l <= SizeGet {
+		return datastore.GetMulti(c, key, src)
+	}
+
+	var errs []error
+	var batch []*datastore.Key
+
+	for s, e := 0, 0; s < l; s += SizeGet {
+		e = s + SizeGet
+		if e > l {
+			e = l
+		}
+
+		batch = key[s:e]
+
+		//c.Infof("Fetching: %v %v", s, e)
+		err := datastore.GetMulti(c, batch, src[s:e])
+		if err != nil {
+			if me, ok := err.(appengine.MultiError); ok {
+				if len(errs) == 0 { // lazy init
+					errs = make([]error, s, l) // add nils for previous batches
+				}
+
+				for i := range me {
+					errs = append(errs, me[i])
+				}
+			} else {
+				return err
+			}
+		} else if len(errs) > 0 { // no errors, but another batch had errors, so add nils
+			for _ = range batch {
+				errs = append(errs, nil)
+			}
+		}
+	}
+
+	if len(errs) > 0 {
+		return appengine.MultiError(errs) // combined multi-error for the whole set
+	}
+
+	return nil
+}
+
+/*func GetMulti(c appengine.Context, key []*datastore.Key, src interface{}) (error) {
 	if len(key) <= SizeGet {
 		return datastore.GetMulti(c, key, src)
 	}
@@ -161,7 +211,7 @@ func GetMulti(c appengine.Context, key []*datastore.Key, src interface{}) (error
 			s = reflect.Append(s, v.Index(i+j))
 		}
 
-		c.Infof("Fetching: %v %v", i, e)
+		//c.Infof("Fetching: %v %v", i, e)
 		err := datastore.GetMulti(c, batch, s.Interface())
 		if err != nil {
 			if me, ok := err.(appengine.MultiError); ok {
@@ -187,4 +237,4 @@ func GetMulti(c appengine.Context, key []*datastore.Key, src interface{}) (error
 	}
 
 	return nil
-}
+}*/
