@@ -5,7 +5,7 @@
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
 
-       http://www.apache.org/licenses/LICENSE-2.0
+	   http://www.apache.org/licenses/LICENSE-2.0
 
    Unless required by applicable law or agreed to in writing, software
    distributed under the License is distributed on an "AS IS" BASIS,
@@ -105,7 +105,7 @@ func PutMulti(c appengine.Context, key []*datastore.Key, src interface{}) ([]*da
 		for j := 0; j < SizePut && i+j < l; j++ {
 			s = reflect.Append(s, v.Index(i+j))
 		}
-		
+
 		k, err := datastore.PutMulti(c, batch, s.Interface())
 		if err != nil {
 			if me, ok := err.(appengine.MultiError); ok {
@@ -136,7 +136,7 @@ func PutMulti(c appengine.Context, key []*datastore.Key, src interface{}) ([]*da
 	return key, nil
 }
 
-func GetMulti(c appengine.Context, key []*datastore.Key, src interface{}) (error) {
+/*func GetMulti(c appengine.Context, key []*datastore.Key, src interface{}) (error) {
 	l := len(key)
 
 	// only split into batches if needed
@@ -181,9 +181,9 @@ func GetMulti(c appengine.Context, key []*datastore.Key, src interface{}) (error
 	}
 
 	return nil
-}
+}*/
 
-/*func GetMulti(c appengine.Context, key []*datastore.Key, src interface{}) (error) {
+func GetMulti(c appengine.Context, key []*datastore.Key, src interface{}) (error) {
 	if len(key) <= SizeGet {
 		return datastore.GetMulti(c, key, src)
 	}
@@ -208,10 +208,10 @@ func GetMulti(c appengine.Context, key []*datastore.Key, src interface{}) (error
 
 		s := reflect.MakeSlice(v.Type(), 0, len(key))//SizeGet)
 		for j := 0; j < SizeGet && i+j < l; j++ {
-			s = reflect.Append(s, v.Index(i+j))
+				s = reflect.Append(s, v.Index(i+j))
 		}
 
-		//c.Infof("Fetching: %v %v", i, e)
+		c.Infof("Fetching: %v %v", i, e)
 		err := datastore.GetMulti(c, batch, s.Interface())
 		if err != nil {
 			if me, ok := err.(appengine.MultiError); ok {
@@ -233,8 +233,8 @@ func GetMulti(c appengine.Context, key []*datastore.Key, src interface{}) (error
 	}
 
 	if len(errs) > 0 {
-		return appengine.MultiError(errs) // combined multi-error for the whole set
+		  return appengine.MultiError(errs) // combined multi-error for the whole set
 	}
 
 	return nil
-}*/
+}
