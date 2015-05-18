@@ -51,7 +51,7 @@ type RetryOptions struct {
 
 var defaultRetryOptions = &RetryOptions{Retries: 5, InitialDelay: 100 * time.Millisecond, Backoff: 2.0, Rand: nil}
 
-func Retry(c appengine.Context, fn func() error, o *RetryOptions) error {
+func Retry(c appengine.Context, fn func(c appengine.Context) error, o *RetryOptions) error {
 	if o == nil { // use defaults
 		o = defaultRetryOptions
 	} else { // fill in defaults
@@ -70,7 +70,7 @@ func Retry(c appengine.Context, fn func() error, o *RetryOptions) error {
 	var fuzz *rand.Rand
 	retries := o.Retries
 	for {
-		if err := fn(); err == nil {
+		if err := fn(c); err == nil {
 			return nil
 		} else if appengine.IsTimeoutError(err) || IsRetryError(err) {
 
