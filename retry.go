@@ -17,6 +17,7 @@ package batch
 
 import (
 	"appengine"
+	"appengine/datastore"
 	"math/rand"
 	"time"
 )
@@ -72,7 +73,7 @@ func Retry(c appengine.Context, fn func(c appengine.Context) error, o *RetryOpti
 	for {
 		if err := fn(c); err == nil {
 			return nil
-		} else if appengine.IsTimeoutError(err) || IsRetryError(err) {
+		} else if err == datastore.ErrConcurrentTransaction || appengine.IsTimeoutError(err) || IsRetryError(err) {
 
 			// randomized exponential backoff policy (cf. https://cloud.google.com/appengine/articles/scalability#backoff )
 			if retries == 0 { // give up after retries
