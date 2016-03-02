@@ -16,9 +16,10 @@
 package batch
 
 import (
-	"appengine"
-	"appengine/datastore"
 	"errors"
+	"golang.org/x/net/context"
+	"google.golang.org/appengine"
+	"google.golang.org/appengine/datastore"
 	"reflect"
 )
 
@@ -29,7 +30,7 @@ var (
 )
 
 // batch slice into frames of Size
-func DeleteMulti(c appengine.Context, key []*datastore.Key) error {
+func DeleteMulti(c context.Context, key []*datastore.Key) error {
 	l := len(key)
 
 	// only split into batches if needed
@@ -73,7 +74,7 @@ func DeleteMulti(c appengine.Context, key []*datastore.Key) error {
 	return nil
 }
 
-func PutMulti(c appengine.Context, key []*datastore.Key, src interface{}) ([]*datastore.Key, error) {
+func PutMulti(c context.Context, key []*datastore.Key, src interface{}) ([]*datastore.Key, error) {
 	// only split into batches if needed
 	if len(key) <= SizePut {
 		return datastore.PutMulti(c, key, src)
@@ -128,7 +129,7 @@ func PutMulti(c appengine.Context, key []*datastore.Key, src interface{}) ([]*da
 	return key, nil
 }
 
-func GetMulti(c appengine.Context, key []*datastore.Key, src interface{}) error {
+func GetMulti(c context.Context, key []*datastore.Key, src interface{}) error {
 	if len(key) <= SizeGet {
 		return datastore.GetMulti(c, key, src)
 	}

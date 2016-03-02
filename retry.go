@@ -1,5 +1,5 @@
 /*
-   Copyright 2015 Alexander Yngling
+   Copyright 2016 Alexander Yngling
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -16,31 +16,19 @@
 package batch
 
 import (
-	"appengine"
-	"appengine/datastore"
+	"golang.org/x/net/context"
+	"google.golang.org/appengine"
+	"google.golang.org/appengine/datastore"
 	"math/rand"
 	"time"
 )
 
-type RetryError struct {
-	err error
+type Retriable interface {
+	IsRetriable() bool
 }
 
-func (this *RetryError) Error() string {
-	return this.err.Error()
-}
-
-func (this *RetryError) Actual() error {
-	return this.err
-}
-
-func NewRetryError(err error) *RetryError {
-	return &RetryError{err}
-}
-
-func IsRetryError(err error) bool {
-	_, ok := err.(*RetryError)
-	return ok
+func IsInherentlytRetriable(err error) bool {
+	return err == datastore.ErrConcurrentTransaction || appengine.IsTimeoutError(err)
 }
 
 type RetryOptions struct {
@@ -52,7 +40,7 @@ type RetryOptions struct {
 
 var defaultRetryOptions = &RetryOptions{Retries: 5, InitialDelay: 100 * time.Millisecond, Backoff: 2.0, Rand: nil}
 
-func Retry(c appengine.Context, fn func(c appengine.Context) error, o *RetryOptions) error {
+func Retry(c context.Context, fn func(c context.Context) error, o *RetryOptions) error {
 	if o == nil { // use defaults
 		o = defaultRetryOptions
 	} else { // fill in defaults
@@ -69,11 +57,11 @@ func Retry(c appengine.Context, fn func(c appengine.Context) error, o *RetryOpti
 
 	var awhile time.Duration = 0 // lazy init
 	var fuzz *rand.Rand
-	retries := o.Retries
+	retries := o.Retries // copy
 	for {
 		if err := fn(c); err == nil {
 			return nil
-		} else if err == datastore.ErrConcurrentTransaction || appengine.IsTimeoutError(err) || IsRetryError(err) {
+		} else if r, ok := err.(Retriable); (ok && r.IsRetriable()) || IsInherentlytRetriable(err) { // check for retriable errors
 
 			// randomized exponential backoff policy (cf. https://cloud.google.com/appengine/articles/scalability#backoff )
 			if retries == 0 { // give up after retries
@@ -88,7 +76,7 @@ func Retry(c appengine.Context, fn func(c appengine.Context) error, o *RetryOpti
 			} else {
 				awhile = time.Duration(float64(awhile) * o.Backoff)
 			}
-			time.Sleep(time.Duration((fuzz.Float64() / 2.0 + 0.75) * float64(awhile))) // random component to avoid thundering herd problem (values taken from https://github.com/GoogleCloudPlatform/appengine-gcs-client/blob/master/java/src/main/java/com/google/appengine/tools/cloudstorage/RetryHelper.java )
+			time.Sleep(time.Duration((fuzz.Float64()/2.0 + 0.75) * float64(awhile))) // random component to avoid thundering herd problem (values taken from https://github.com/GoogleCloudPlatform/appengine-gcs-client/blob/master/java/src/main/java/com/google/appengine/tools/cloudstorage/RetryHelper.java )
 			retries--
 			continue
 		} else {

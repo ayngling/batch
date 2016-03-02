@@ -15,7 +15,7 @@
 */
 package batch
 
-import "appengine/datastore"
+import "google.golang.org/appengine/datastore"
 
 const DefaultSize = 5
 
